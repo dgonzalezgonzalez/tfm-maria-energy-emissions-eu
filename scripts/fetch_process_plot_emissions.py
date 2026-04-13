@@ -21,6 +21,8 @@ RAW_PATH = Path("data/raw/eurostat_env_air_gge_es_eu27_crf1.json")
 ABS_CSV_PATH = Path("data/processed/emisiones_energia_es_ue.csv")
 IDX_CSV_PATH = Path("data/processed/emisiones_energia_es_ue_index.csv")
 PLOT_PATH = Path("output/figures/emisiones_energia_es_ue_indice.png")
+ABS_PC_CSV_PATH = Path("data/processed/emisiones_energia_es_vs_ue_promedio_pais_abs.csv")
+ABS_PC_PLOT_PATH = Path("output/figures/emisiones_energia_es_vs_ue_promedio_pais_abs.png")
 
 
 def compute_strides(sizes):
@@ -138,11 +140,81 @@ def main():
     PLOT_PATH.parent.mkdir(parents=True, exist_ok=True)
     plt.tight_layout(rect=[0, 0.03, 1, 1])
     plt.savefig(PLOT_PATH, dpi=180)
+    plt.close()
+
+    # Absolute comparison: Spain vs EU-27 average emissions per country.
+    # We derive EU per-country average from official EU27_2020 aggregate divided by 27.
+    abs_pc_rows = []
+    for r in filtered:
+        if r["geo"] == "ES":
+            abs_pc_rows.append(
+                {
+                    "year": r["year"],
+                    "series": "ES",
+                    "emissions_mio_t": r["emissions_mio_t"],
+                }
+            )
+        elif r["geo"] == "EU27_2020":
+            abs_pc_rows.append(
+                {
+                    "year": r["year"],
+                    "series": "EU27_AVG_PER_COUNTRY",
+                    "emissions_mio_t": r["emissions_mio_t"] / 27.0,
+                }
+            )
+
+    with ABS_PC_CSV_PATH.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["year", "series", "emissions_mio_t"])
+        w.writeheader()
+        for r in sorted(abs_pc_rows, key=lambda x: (x["year"], x["series"])):
+            w.writerow(
+                {
+                    "year": r["year"],
+                    "series": r["series"],
+                    "emissions_mio_t": f"{r['emissions_mio_t']:.6f}",
+                }
+            )
+
+    es_abs = sorted([r for r in abs_pc_rows if r["series"] == "ES"], key=lambda x: x["year"])
+    eu_avg_abs = sorted(
+        [r for r in abs_pc_rows if r["series"] == "EU27_AVG_PER_COUNTRY"],
+        key=lambda x: x["year"],
+    )
+
+    plt.figure(figsize=(11, 6))
+    plt.plot([r["year"] for r in es_abs], [r["emissions_mio_t"] for r in es_abs], label="España", linewidth=2.2)
+    plt.plot(
+        [r["year"] for r in eu_avg_abs],
+        [r["emissions_mio_t"] for r in eu_avg_abs],
+        label="UE-27 promedio por país (total UE/27)",
+        linewidth=2.2,
+    )
+    plt.title("Emisiones GEI del sector energético en términos absolutos")
+    plt.xlabel("Año")
+    plt.ylabel("Millones de toneladas CO2e")
+    plt.legend()
+    plt.grid(alpha=0.25)
+    plt.figtext(
+        0.01,
+        0.01,
+        (
+            "Fuente: Eurostat env_air_gge (CRF1, GHG, MIO_T). "
+            "Promedio UE-27 calculado como agregado EU27_2020 / 27."
+        ),
+        ha="left",
+        fontsize=9,
+    )
+    ABS_PC_PLOT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    plt.tight_layout(rect=[0, 0.03, 1, 1])
+    plt.savefig(ABS_PC_PLOT_PATH, dpi=180)
+    plt.close()
 
     print(f"raw_json={RAW_PATH}")
     print(f"abs_csv={ABS_CSV_PATH}")
     print(f"idx_csv={IDX_CSV_PATH}")
     print(f"plot_png={PLOT_PATH}")
+    print(f"abs_pc_csv={ABS_PC_CSV_PATH}")
+    print(f"abs_pc_plot_png={ABS_PC_PLOT_PATH}")
     print(f"base_year={base_year}")
     print(f"rows_abs={len(filtered)} rows_idx={len(indexed)}")
 
