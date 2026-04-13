@@ -16,13 +16,21 @@ URL = (
     "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/"
     "env_air_gge?geo=ES&geo=EU27_2020&airpol=GHG&unit=MIO_T&src_crf=CRF1&sinceTimePeriod=1990"
 )
+URL_SECTOR_SHARES = (
+    "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/"
+    "env_air_gge?geo=ES&geo=EU27_2020&airpol=GHG&unit=MIO_T&time=2023"
+    "&src_crf=CRF1&src_crf=CRF2&src_crf=CRF3&src_crf=CRF5&src_crf=TOTX4_MEMO"
+)
 
 RAW_PATH = Path("data/raw/eurostat_env_air_gge_es_eu27_crf1.json")
+RAW_SECTOR_SHARES_PATH = Path("data/raw/eurostat_env_air_gge_sector_shares_es_eu_2023.json")
 ABS_CSV_PATH = Path("data/processed/emisiones_energia_es_ue.csv")
 IDX_CSV_PATH = Path("data/processed/emisiones_energia_es_ue_index.csv")
 PLOT_PATH = Path("output/figures/emisiones_energia_es_ue_indice.png")
 ABS_PC_CSV_PATH = Path("data/processed/emisiones_energia_es_vs_ue_promedio_pais_abs.csv")
 ABS_PC_PLOT_PATH = Path("output/figures/emisiones_energia_es_vs_ue_promedio_pais_abs.png")
+SECTOR_SHARE_CSV_PATH = Path("data/processed/contribucion_sectorial_es_ue_2023.csv")
+SECTOR_SHARE_PLOT_PATH = Path("output/figures/contribucion_sector_energetico_mayor_es_ue.png")
 
 
 def compute_strides(sizes):
@@ -54,6 +62,15 @@ def main():
         payload = fetch_json(URL)
         RAW_PATH.parent.mkdir(parents=True, exist_ok=True)
         RAW_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    if RAW_SECTOR_SHARES_PATH.exists():
+        payload_shares = json.loads(RAW_SECTOR_SHARES_PATH.read_text(encoding="utf-8"))
+    else:
+        payload_shares = fetch_json(URL_SECTOR_SHARES)
+        RAW_SECTOR_SHARES_PATH.parent.mkdir(parents=True, exist_ok=True)
+        RAW_SECTOR_SHARES_PATH.write_text(
+            json.dumps(payload_shares, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
 
     ids = payload["id"]
     sizes = payload["size"]
@@ -209,12 +226,134 @@ def main():
     plt.savefig(ABS_PC_PLOT_PATH, dpi=180)
     plt.close()
 
+    # Sector contribution shares (economic sectors): CRF1/2/3/5 over TOTX4_MEMO.
+    ids_s = payload_shares["id"]
+    sizes_s = payload_shares["size"]
+    dim_s = payload_shares["dimension"]
+    values_s = payload_shares["value"]
+    strides_s = compute_strides(sizes_s)
+
+    index_to_label_s = {}
+    for dim_name in ids_s:
+        cat = dim_s[dim_name]["category"]
+        index_to_label_s[dim_name] = {v: k for k, v in cat["index"].items()}
+
+    rows_s = []
+    for k, v in values_s.items():
+        lin = int(k)
+        coords = decode_linear_index(lin, sizes_s, strides_s)
+        rec = {}
+        for dim_name, coord in zip(ids_s, coords):
+            rec[dim_name] = index_to_label_s[dim_name][coord]
+        rec["emissions_mio_t"] = float(v)
+        rows_s.append(rec)
+
+    sector_labels = {
+        "CRF1": "Energía",
+        "CRF2": "Procesos industriales",
+        "CRF3": "Agricultura",
+        "CRF5": "Residuos",
+    }
+    total_code = "TOTX4_MEMO"
+
+    totals = {}
+    for r in rows_s:
+        if r["src_crf"] == total_code:
+            totals[(r["geo"], int(r["time"]))] = r["emissions_mio_t"]
+
+    share_rows = []
+    for r in rows_s:
+        src = r["src_crf"]
+        if src not in sector_labels:
+            continue
+        geo = r["geo"]
+        year = int(r["time"])
+        total = totals.get((geo, year))
+        if total is None or total == 0:
+            continue
+        share = 100.0 * r["emissions_mio_t"] / total
+        share_rows.append(
+            {
+                "year": year,
+                "geo": geo,
+                "sector_code": src,
+                "sector": sector_labels[src],
+                "emissions_mio_t": r["emissions_mio_t"],
+                "total_mio_t": total,
+                "share_pct": share,
+            }
+        )
+
+    with SECTOR_SHARE_CSV_PATH.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(
+            f,
+            fieldnames=[
+                "year",
+                "geo",
+                "sector_code",
+                "sector",
+                "emissions_mio_t",
+                "total_mio_t",
+                "share_pct",
+            ],
+        )
+        w.writeheader()
+        for r in sorted(share_rows, key=lambda x: (x["geo"], x["sector_code"])):
+            w.writerow(
+                {
+                    "year": r["year"],
+                    "geo": r["geo"],
+                    "sector_code": r["sector_code"],
+                    "sector": r["sector"],
+                    "emissions_mio_t": f"{r['emissions_mio_t']:.6f}",
+                    "total_mio_t": f"{r['total_mio_t']:.6f}",
+                    "share_pct": f"{r['share_pct']:.4f}",
+                }
+            )
+
+    target_year = max(int(r["time"]) for r in rows_s)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharey=True)
+    for ax, geo, title in [
+        (axes[0], "ES", "España"),
+        (axes[1], "EU27_2020", "UE-27"),
+    ]:
+        data_geo = [r for r in share_rows if r["geo"] == geo and r["year"] == target_year]
+        data_geo.sort(key=lambda x: x["share_pct"], reverse=True)
+        sectors = [r["sector"] for r in data_geo]
+        shares = [r["share_pct"] for r in data_geo]
+        colors = ["#d62728" if r["sector_code"] == "CRF1" else "#9aa0a6" for r in data_geo]
+        bars = ax.barh(sectors, shares, color=colors)
+        ax.invert_yaxis()
+        ax.set_title(title)
+        ax.set_xlabel("% sobre total (excl. LULUCF)")
+        for b, s in zip(bars, shares):
+            ax.text(b.get_width() + 0.3, b.get_y() + b.get_height() / 2, f"{s:.1f}%", va="center", fontsize=9)
+
+    fig.suptitle(f"Contribución sectorial a emisiones totales ({target_year})")
+    plt.figtext(
+        0.01,
+        0.01,
+        (
+            "Fuente: Eurostat env_air_gge. Total = TOTX4_MEMO "
+            "(excluye LULUCF y memo items). Energía (CRF1) resaltada."
+        ),
+        ha="left",
+        fontsize=9,
+    )
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    SECTOR_SHARE_PLOT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(SECTOR_SHARE_PLOT_PATH, dpi=180)
+    plt.close()
+
     print(f"raw_json={RAW_PATH}")
     print(f"abs_csv={ABS_CSV_PATH}")
     print(f"idx_csv={IDX_CSV_PATH}")
     print(f"plot_png={PLOT_PATH}")
     print(f"abs_pc_csv={ABS_PC_CSV_PATH}")
     print(f"abs_pc_plot_png={ABS_PC_PLOT_PATH}")
+    print(f"sector_share_raw_json={RAW_SECTOR_SHARES_PATH}")
+    print(f"sector_share_csv={SECTOR_SHARE_CSV_PATH}")
+    print(f"sector_share_plot_png={SECTOR_SHARE_PLOT_PATH}")
     print(f"base_year={base_year}")
     print(f"rows_abs={len(filtered)} rows_idx={len(indexed)}")
 
