@@ -382,7 +382,7 @@ def main():
         "CRF3": "#2ca02c",
         "CRF5": "#9467bd",
     }
-    fig, axes = plt.subplots(1, 2, figsize=(13, 6), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(14, 7.8), sharey=True)
     for ax, geo, title in [
         (axes[0], "ES", "España"),
         (axes[1], "EU27_2020", "UE-27"),
@@ -408,15 +408,16 @@ def main():
     fig.legend(
         handles,
         labels,
-        loc="upper center",
-        bbox_to_anchor=(0.5, 0.95),
-        ncol=4,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.02),
+        ncol=2,
         frameon=False,
-        columnspacing=2.2,
-        handletextpad=0.8,
-        borderaxespad=0.6,
+        columnspacing=3.0,
+        handletextpad=1.0,
+        borderaxespad=0.8,
+        fontsize=10,
     )
-    fig.suptitle("Evolución de contribuciones sectoriales a emisiones totales", y=0.995)
+    fig.suptitle("Evolución de contribuciones sectoriales a emisiones totales", y=0.97)
     plt.figtext(
         0.01,
         0.01,
@@ -427,7 +428,7 @@ def main():
         ha="left",
         fontsize=9,
     )
-    plt.tight_layout(rect=[0, 0.05, 1, 0.84])
+    plt.tight_layout(rect=[0, 0.12, 1, 0.92])
     SECTOR_SHARE_TS_PLOT_PATH.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(SECTOR_SHARE_TS_PLOT_PATH, dpi=180)
     plt.close()
