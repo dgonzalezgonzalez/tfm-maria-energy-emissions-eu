@@ -405,8 +405,18 @@ def main():
 
     axes[0].set_ylabel("% sobre total (excl. LULUCF)")
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncol=4, frameon=False)
-    fig.suptitle("Evolución de contribuciones sectoriales a emisiones totales")
+    fig.legend(
+        handles,
+        labels,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.95),
+        ncol=4,
+        frameon=False,
+        columnspacing=2.2,
+        handletextpad=0.8,
+        borderaxespad=0.6,
+    )
+    fig.suptitle("Evolución de contribuciones sectoriales a emisiones totales", y=0.995)
     plt.figtext(
         0.01,
         0.01,
@@ -417,7 +427,7 @@ def main():
         ha="left",
         fontsize=9,
     )
-    plt.tight_layout(rect=[0, 0.05, 1, 0.90])
+    plt.tight_layout(rect=[0, 0.05, 1, 0.84])
     SECTOR_SHARE_TS_PLOT_PATH.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(SECTOR_SHARE_TS_PLOT_PATH, dpi=180)
     plt.close()
