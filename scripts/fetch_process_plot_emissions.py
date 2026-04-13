@@ -383,6 +383,12 @@ def main():
         "CRF5": "#9467bd",
     }
     fig, axes = plt.subplots(1, 2, figsize=(14, 7.8), sharey=True)
+    legend_labels_ts = {
+        "CRF1": "Energía",
+        "CRF2": "Proc. ind.",
+        "CRF3": "Agricultura",
+        "CRF5": "Residuos",
+    }
     for ax, geo, title in [
         (axes[0], "ES", "España"),
         (axes[1], "EU27_2020", "UE-27"),
@@ -395,7 +401,7 @@ def main():
             ax.plot(
                 [r["year"] for r in series],
                 [r["share_pct"] for r in series],
-                label=sector_labels[code],
+                label=legend_labels_ts[code],
                 color=color_map[code],
                 linewidth=2.2 if code == "CRF1" else 1.8,
             )
@@ -409,13 +415,13 @@ def main():
         handles,
         labels,
         loc="lower center",
-        bbox_to_anchor=(0.5, 0.02),
+        bbox_to_anchor=(0.5, 0.015),
         ncol=2,
         frameon=False,
-        columnspacing=3.0,
+        columnspacing=4.0,
         handletextpad=1.0,
         borderaxespad=0.8,
-        fontsize=10,
+        fontsize=11,
     )
     fig.suptitle("Evolución de contribuciones sectoriales a emisiones totales", y=0.97)
     plt.figtext(
@@ -428,7 +434,7 @@ def main():
         ha="left",
         fontsize=9,
     )
-    plt.tight_layout(rect=[0, 0.12, 1, 0.92])
+    plt.tight_layout(rect=[0, 0.16, 1, 0.92])
     SECTOR_SHARE_TS_PLOT_PATH.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(SECTOR_SHARE_TS_PLOT_PATH, dpi=180)
     plt.close()
