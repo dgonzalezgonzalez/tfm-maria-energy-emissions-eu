@@ -385,7 +385,7 @@ def main():
     fig, axes = plt.subplots(1, 2, figsize=(14, 7.8), sharey=True)
     legend_labels_ts = {
         "CRF1": "Energía",
-        "CRF2": "Procedimientos Industriales",
+        "CRF2": "Procesos Industriales",
         "CRF3": "Agricultura",
         "CRF5": "Residuos",
     }
