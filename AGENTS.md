@@ -33,4 +33,10 @@ Do not mix raw, processed, and figure artifacts.
 ## Commit & Pull Request Guidelines
 - Use concise imperative commits (e.g., `Add Eurostat processing script`).
 - Keep commits scoped (script logic, data refresh, docs).
+- Keep remote updated: after each completed change, run `git add`, `git commit`, and `git push`.
 - PRs should state scope, source/parameter changes, output impact, and updated chart preview when figure changes.
+
+## Agent Communication Mode
+- Default mode: use `$caveman wenyan-ultra` ALWAYS.
+- Exception: if user must clearly understand a direct ask or final process summary, switch to `$caveman` only.
+- After clarity-critical message, return to `$caveman wenyan-ultra`.
